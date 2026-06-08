@@ -1,0 +1,20 @@
+[server]
+# Headless mode — no browser auto-opens (required for production)
+headless = true
+port = 8501
+enableCORS = false
+enableXsrfProtection = true
+
+# Max file/message sizes (MB)
+maxUploadSize = 10
+maxMessageSize = 50
+
+[runner]
+# Faster reruns — reduces perceived lag for each user
+fastReruns = true
+
+[browser]
+gatherUsageStats = false
+
+[global]
+suppressDeprecationWarnings = true
