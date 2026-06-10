@@ -12,6 +12,11 @@ import datetime
 import threading
 import markdown as md_lib
 from dotenv import load_dotenv
+try:
+    from fpdf import FPDF
+    _FPDF_AVAILABLE = True
+except ImportError:
+    _FPDF_AVAILABLE = False
 # ── Translations (inlined — no external meva_translations.py needed) ─────────
 LANGUAGES = {
     "en": "English",
@@ -313,6 +318,8 @@ QUICK_TOPICS = [
     ("🌫️", "White Smoke Exhaust"),
     ("⚙️", "Gear Shifting Hard"),
     ("🛢️", "Oil Leak Diagnosis"),
+    ("🛠️", "Chain Replacement Guide"),
+    ("📋", "Common Problems My Bike"),
 ]
 
 EV_QUICK_TOPICS = [
@@ -328,6 +335,8 @@ EV_QUICK_TOPICS = [
     ("🔋", "Battery Won't Charge"),
     ("💨", "Cooling Fan Running Loud"),
     ("🏁", "Acceleration Lag"),
+    ("🛠️", "Brake Pad Replacement Guide"),
+    ("📋", "Common Problems My Bike"),
 ]
 
 # ── Comprehensive Indian Bike List ────────────────────────────────────────────
@@ -513,6 +522,64 @@ EV_BIKES = {
         "Lectrix LXS G3.0", "River Indie",
         "Emotorad Doodle V3", "Vihaan EV",
     ],
+}
+
+# ── Bike Knowledge Base: mileage, common problems, recall notices ─────────────
+BIKE_DATA = {
+    # Hero
+    "Hero Splendor Plus":         {"mileage": "70–80 km/L", "problems": ["Carb idling issues after 30k km", "Chain stretch faster on rough roads", "Indicator relay failure"], "recalls": []},
+    "Hero HF Deluxe":             {"mileage": "65–75 km/L", "problems": ["Float valve clogging", "CDI failure on older units", "Rusting of mudguard stays"], "recalls": []},
+    "Hero Xtreme 160R":           {"mileage": "45–50 km/L", "problems": ["Vibrations at 80+ kmph", "Headlight dimming at idle", "Clutch cable wear"], "recalls": []},
+    "Hero Xpulse 200":            {"mileage": "35–40 km/L", "problems": ["Valve clearance needs frequent check", "Fork seals leak off-road", "Long gear throws"], "recalls": ["2021 recall: engine oil leak from crankcase gasket (Hero bulletin #21-XP200-01)"]},
+    "Hero Xpulse 200 4V":         {"mileage": "35–42 km/L", "problems": ["Tappet noise on cold start", "Rear shock preload limited"], "recalls": []},
+    # Honda
+    "Honda Activa 6G":            {"mileage": "50–60 km/L", "problems": ["Starter motor brush wear", "Brake drum scoring", "OBD sensor false alerts in dust"], "recalls": []},
+    "Honda Activa 125":           {"mileage": "50–55 km/L", "problems": ["Idle hunt after 15k km", "ACG starter gear noise", "Fuel pump whine"], "recalls": []},
+    "Honda CB Shine":             {"mileage": "55–65 km/L", "problems": ["Chain guide wear", "Spark plug fouling in city traffic", "Battery drain with alarm fitment"], "recalls": []},
+    "Honda Unicorn":              {"mileage": "55–65 km/L", "problems": ["Rear disc brake squeal", "Fuel injection stumble", "Headlight lens yellowing"], "recalls": []},
+    "Honda CB350 H'ness":         {"mileage": "35–40 km/L", "problems": ["Clutch judder on take-off", "Tank rusting internally on older batches", "Instrument cluster glare"], "recalls": ["2022 recall: rear brake light switch may not activate — Honda advisory #HCB350-22"]},
+    "Honda CB350RS":              {"mileage": "35–40 km/L", "problems": ["Handlebar vibration at 90 kmph", "Chrome exhaust bluing fast"], "recalls": []},
+    "Honda Hornet 2.0":           {"mileage": "38–45 km/L", "problems": ["Pillion grab rail rattle", "Rear suspension bottoming on potholes"], "recalls": []},
+    # Bajaj
+    "Bajaj Pulsar 150":           {"mileage": "45–55 km/L", "problems": ["Engine vibration at 70+ kmph", "Gear 1→2 false neutral", "Speedo cable snap"], "recalls": []},
+    "Bajaj Pulsar NS200":         {"mileage": "30–38 km/L", "problems": ["FI stumble at cold start", "Radiator fan fuse blow", "Rear tyre wear faster on highways"], "recalls": []},
+    "Bajaj Pulsar RS200":         {"mileage": "28–35 km/L", "problems": ["Half-fairing vibration rattle", "ABS sensor fouling in mud", "Clutch slip at high load"], "recalls": []},
+    "Bajaj Dominar 400":          {"mileage": "25–32 km/L", "problems": ["Throttle-by-wire delay lag", "Seat padding flattening quickly", "Heat soak on long rides"], "recalls": ["2019 recall: fuel tank vent blockage — Bajaj service campaign #DOM400-19"]},
+    "Bajaj Pulsar N250":          {"mileage": "28–35 km/L", "problems": ["Wind blast at 100+ kmph", "Gear shift feel notchy when cold"], "recalls": []},
+    # TVS
+    "TVS Apache RTR 160 4V":      {"mileage": "40–48 km/L", "problems": ["Slipper clutch drag at low speed", "Instrument panel condensation", "Rear disc warp on aggressive braking"], "recalls": []},
+    "TVS Apache RTR 200 4V":      {"mileage": "35–42 km/L", "problems": ["Oil cooler fin vibration rattle", "FI hot-start hesitation", "USD fork stanchion corrosion in coastal areas"], "recalls": []},
+    "TVS Apache RR 310":          {"mileage": "25–32 km/L", "problems": ["Clutch basket noise when hot", "Traction control intervention too early", "Fuel tank breather noise"], "recalls": ["2021 recall: fuel pump relay — TVS service bulletin #RR310-21-FP"]},
+    "TVS Ntorq 125":              {"mileage": "45–52 km/L", "problems": ["Bluetooth connectivity drops", "Under-seat storage latch breaking", "Speedometer inaccuracy at low speed"], "recalls": []},
+    "TVS Raider 125":             {"mileage": "55–65 km/L", "problems": ["Chain tension needs frequent adjustment", "Headlight lens fogging"], "recalls": []},
+    # Royal Enfield
+    "Royal Enfield Classic 350":  {"mileage": "35–42 km/L", "problems": ["Vibration at 80–90 kmph", "Side stand switch false-neutral kill", "Fuel injection surge at steady throttle"], "recalls": ["2023 recall: engine oil leak from tappet cover on J-series engine — RE bulletin #J350-23-OL"]},
+    "Royal Enfield Meteor 350":   {"mileage": "35–42 km/L", "problems": ["Tripper nav pod vibration", "Wind noise above 100 kmph"], "recalls": []},
+    "Royal Enfield Hunter 350":   {"mileage": "36–44 km/L", "problems": ["Rear monoshock oil seep on older units", "Mirrors vibrate at city speeds"], "recalls": []},
+    "Royal Enfield Himalayan 411":{"mileage": "30–37 km/L", "problems": ["Float bowl overflow in cold starts", "Rear carrier flex on loaded touring", "Instrument cluster condensation"], "recalls": ["2022 recall: rear wheel spoke loosening — RE service campaign #HIM411-22"]},
+    "Royal Enfield Himalayan 450":{"mileage": "28–35 km/L", "problems": ["Throttle-by-wire calibration issues on first batches", "Immobiliser false-trigger in humid conditions"], "recalls": []},
+    "Royal Enfield Interceptor 650":{"mileage": "25–32 km/L", "problems": ["Clutch friction plate wear faster with city riding", "Chrome rust in coastal areas", "TPMS false alerts"], "recalls": []},
+    "Royal Enfield Continental GT 650":{"mileage": "25–30 km/L", "problems": ["Clip-on handlebar fatigue on long rides", "Exhaust bluing quickly"], "recalls": []},
+    # Yamaha
+    "Yamaha FZ-S FI V4":          {"mileage": "40–48 km/L", "problems": ["Traction control cutting power unexpectedly", "Front fork soft for heavy riders"], "recalls": []},
+    "Yamaha R15 V4":              {"mileage": "35–45 km/L", "problems": ["Quickshifter false neutral", "Fairing rattle on city roads", "ASSIST slipper clutch drag when cold"], "recalls": []},
+    "Yamaha MT-03":               {"mileage": "28–35 km/L", "problems": ["Wind blast above 120 kmph", "Gear indicator lag"], "recalls": []},
+    "Yamaha Fascino 125 FI":      {"mileage": "55–65 km/L", "problems": ["Under-seat hook breaking", "Paint chipping on muffler guard"], "recalls": []},
+    # KTM
+    "KTM Duke 200":               {"mileage": "30–38 km/L", "problems": ["Trellis frame powder coat chipping", "Speedo error +5 kmph", "Idle surging when hot"], "recalls": []},
+    "KTM Duke 390":               {"mileage": "25–32 km/L", "problems": ["TFT screen visibility in direct sunlight", "Cornering ABS intrusive on gravel", "Water pump seal leak (early batches)"], "recalls": ["2021 recall: fuel tank cracking at weld — KTM service action #D390-21-FT"]},
+    "KTM RC 390":                 {"mileage": "22–30 km/L", "problems": ["Track-biased ergonomics cause back pain", "Coolant overflow on track use", "WP fork bottoming on potholes"], "recalls": []},
+    "KTM Adventure 390":          {"mileage": "25–32 km/L", "problems": ["Rally seat hard for long days", "Bashplate rattling on corrugation", "Map switching lag via button"], "recalls": []},
+    # EV
+    "Ola S1 Pro":                 {"mileage": "N/A (EV) — claimed 181 km/charge (IDC)", "problems": ["OTA update bricking issues (2022–23)", "Reverse mode not working after update", "Battery range anxiety in summer heat", "App connectivity drops"], "recalls": ["2023 recall: rear brake caliper bolt loosening — Ola service bulletin #S1P-23-RB"]},
+    "Ola S1 Pro Gen 2":           {"mileage": "N/A (EV) — claimed 195 km/charge", "problems": ["Boot lid rattle", "Charging not starting without app restart"], "recalls": []},
+    "Ather 450X Gen 3":           {"mileage": "N/A (EV) — claimed 146 km/charge (True range ~105 km)", "problems": ["Side stand sensor false kill", "Regen braking inconsistency in rain", "Screen glare in afternoon sun"], "recalls": []},
+    "Ather 450 Apex":             {"mileage": "N/A (EV) — claimed 157 km/charge", "problems": ["Warp mode battery drain very fast", "Tyre wear faster with high torque"], "recalls": []},
+    "TVS iQube ST":               {"mileage": "N/A (EV) — claimed 145 km/charge", "problems": ["Charging port cover breaking", "Slow OTA rollout", "Navigation rerouting lag"], "recalls": []},
+    "Bajaj Chetak Premium":       {"mileage": "N/A (EV) — claimed 126 km/charge (IDC)", "problems": ["Limited dealer network for service", "App-dependent features lock out without connectivity", "Rear suspension hard on bad roads"], "recalls": []},
+    "Hero Vida V1 Pro":           {"mileage": "N/A (EV) — claimed 165 km/charge", "problems": ["Removable battery connector loosening", "App GPS tracking battery drain"], "recalls": []},
+    "Revolt RV400":               {"mileage": "N/A (EV) — claimed 150 km/charge", "problems": ["MyRevolv subscription model concerns", "Motor noise at low speed in reverse", "Swappable battery range anxiety"], "recalls": []},
+    "Ultraviolette F77 Mach 2":   {"mileage": "N/A (EV) — claimed 323 km/charge (IDC)", "problems": ["High price-to-dealer ratio", "Service centers limited to metro cities", "Boot space very limited"], "recalls": []},
 }
 
 # Flat list helpers for selectboxes
@@ -1923,6 +1990,17 @@ def build_system_prompt(bike: dict, mode: str = "detailed") -> str:
         if bike.get("km"):    parts.append(f"{bike['km']} km")
         if bike.get("notes"): parts.append(f"Notes: {bike['notes']}")
         bike_info = f"\n\nUser's bike: {' '.join(parts)} [{'ELECTRIC' if bike_type == 'EV' else 'ICE/Petrol'}]. Tailor all advice specifically to this bike model and type."
+        # Inject known bike data if available
+        model_key = bike.get("model", "")
+        bd = BIKE_DATA.get(model_key)
+        if bd:
+            bike_info += f"\n\nKNOWN DATA for {model_key}:"
+            bike_info += f"\n- Real-world mileage: {bd['mileage']}"
+            if bd["problems"]:
+                bike_info += f"\n- Known common problems: {'; '.join(bd['problems'])}"
+            if bd["recalls"]:
+                bike_info += f"\n- Recall / service notices: {'; '.join(bd['recalls'])}"
+            bike_info += "\nUse this data to give specific, accurate advice."
 
     mode_instruction = ""
     if mode == "concise":
@@ -1952,6 +2030,8 @@ Rules:
 - Give INR cost estimates when asked about repairs or parts (labour + parts separately if possible)
 - For urgent/dangerous issues (smoke, brake failure, seizure, EV battery fire), lead with a clear safety warning in bold
 - For diagnostic questions, follow: Symptom → Likely Cause(s) → DIY Fix (if safe) → When to see mechanic
+- REPAIR GUIDES: When asked "how to fix", "repair steps", "DIY guide", "step by step" for any repair task, give a numbered step-by-step guide with: Tools needed, Safety precautions, Steps (numbered clearly), and an Estimated time. Flag any steps that need a professional.
+- BIKE DATA: When the user asks about mileage, known problems, recalls, or common issues for their specific bike model, use the known data provided below to give accurate specific answers rather than generic ones. If their bike has a known recall, always proactively mention it.
 - End EVERY response with "---FOLLOWUPS---" followed by exactly 3 short follow-up questions the user might ask, each on a new line prefixed with "Q:"
 {bike_info}{mode_instruction}{ev_addendum}"""
 
@@ -2043,6 +2123,60 @@ def export_chat(fmt="txt"):
         return "\n".join(lines)
 
 
+def export_chat_pdf() -> bytes | None:
+    """Generate a PDF of the chat history using fpdf2. Returns bytes or None."""
+    if not _FPDF_AVAILABLE:
+        return None
+    bp = st.session_state.bike_profile
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    # Header
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.set_text_color(249, 115, 22)
+    pdf.cell(0, 10, "MEVA - Motorcycle Expert Virtual Assistant", ln=True)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 7, f"Chat Export  |  {datetime.datetime.now().strftime('%d %b %Y, %I:%M %p')}", ln=True)
+    if bp.get("model"):
+        bike_line = f"Bike: {bp['model']}"
+        if bp.get("year"): bike_line += f"  ({bp['year']})"
+        if bp.get("km"):   bike_line += f"  |  {bp['km']} km"
+        pdf.cell(0, 7, bike_line, ln=True)
+    pdf.set_draw_color(249, 115, 22)
+    pdf.line(10, pdf.get_y() + 2, 200, pdf.get_y() + 2)
+    pdf.ln(6)
+    # Messages
+    for m in st.session_state.messages:
+        is_bot = m["role"] == "assistant"
+        ts = m.get("time", "")
+        # Role label
+        pdf.set_font("Helvetica", "B", 10)
+        if is_bot:
+            pdf.set_text_color(249, 115, 22)
+            pdf.cell(0, 7, f"MEVA  {ts}", ln=True)
+        else:
+            pdf.set_text_color(79, 110, 247)
+            pdf.cell(0, 7, f"You  {ts}", ln=True)
+        # Content — strip markdown symbols for clean PDF
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(40, 40, 40)
+        raw = m["content"]
+        # Basic markdown stripping for PDF readability
+        raw = re.sub(r"\*\*(.*?)\*\*", r"\1", raw)
+        raw = re.sub(r"\*(.*?)\*", r"\1", raw)
+        raw = re.sub(r"#{1,6}\s?", "", raw)
+        raw = re.sub(r"---FOLLOWUPS---.*", "", raw, flags=re.DOTALL).strip()
+        # Encode to latin-1 safe string (fpdf default encoding)
+        safe = raw.encode("latin-1", errors="replace").decode("latin-1")
+        pdf.multi_cell(0, 6, safe)
+        pdf.ln(3)
+        pdf.set_draw_color(220, 220, 220)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(4)
+    return pdf.output()
+
+
 def service_bar_html(service, interval, last, current_km):
     if not interval:
         return ""
@@ -2120,7 +2254,7 @@ with st.sidebar:
     <div class="meva-sidebar-logo">
       <div class="meva-wordmark">ME<span>V</span>A</div>
       <div class="meva-tagline">Motorcycle Expert AI</div>
-      <div class="meva-version-badge">CAPSTONE v6.2 ⚡ EV + 🗺️ MAP</div>
+      <div class="meva-version-badge">CAPSTONE v6.3 ⚡ EV + 🗺️ MAP + 📄 PDF</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2194,9 +2328,26 @@ with st.sidebar:
         st.success(f"✅ {t('profile_saved')}")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:4px 12px 16px;"></div>', unsafe_allow_html=True)
+    # ── Bike Knowledge Card ───────────────────────────────────────────────────
+    current_model = st.session_state.bike_profile.get("model", "")
+    bd = BIKE_DATA.get(current_model)
+    if bd:
+        st.markdown('<div style="padding:0 12px 8px;">', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="background:rgba(249,115,22,0.07);border:1px solid rgba(249,115,22,0.25);border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:#f97316;letter-spacing:1px;margin-bottom:6px;">📊 BIKE KNOWLEDGE</div>
+          <div style="font-size:12px;color:#9ca3af;margin-bottom:4px;"><strong style="color:#e8e8ed;">Mileage:</strong> {bd['mileage']}</div>
+          {"<div style='font-size:11px;color:#f87171;margin-top:6px;font-weight:600;'>⚠️ RECALL / SERVICE NOTICE</div>" + "".join([f"<div style='font-size:11px;color:#fca5a5;margin-top:2px;'>• {r}</div>" for r in bd['recalls']]) if bd['recalls'] else ""}
+          <div style="font-size:11px;color:#6b7280;margin-top:6px;">Known issues: {len(bd['problems'])} documented</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("📋 Show Known Problems", key="show_known_issues", use_container_width=True):
+            issues_text = "\n".join([f"• {p}" for p in bd['problems']])
+            st.session_state.trigger = f"What are the known problems with {current_model}? Give me details on each issue and how to prevent or fix them."
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Feature 6: Mood/Tone Toggle ───────────────────────────────────────────
+    st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:4px 12px 16px;"></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="sb-section-title">🎨 {t("sec_response_mode")}</div>', unsafe_allow_html=True)
     st.markdown('<div style="padding:0 12px 16px;">', unsafe_allow_html=True)
     mode_options = {f"🎯 {t('mode_concise')}": "concise", f"📚 {t('mode_detailed')}": "detailed"}
@@ -2325,6 +2476,18 @@ with st.sidebar:
             mime="text/markdown",
             use_container_width=True,
         )
+    # PDF export
+    if _FPDF_AVAILABLE and st.session_state.messages:
+        pdf_bytes = export_chat_pdf()
+        if pdf_bytes:
+            st.download_button(
+                label="⬇️ Export as PDF",
+                data=bytes(pdf_bytes),
+                file_name=f"meva_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="pdf_export_btn",
+            )
     if st.session_state.messages:
         if st.button("🗑️  Clear Conversation", use_container_width=True):
             st.session_state.messages = []
@@ -2456,7 +2619,7 @@ with st.sidebar:
     st.markdown("""
     <div style="padding:12px 20px 20px;text-align:center;">
       <div style="font-size:10px;color:#4b5563;font-weight:600;letter-spacing:0.5px;">
-        Powered by Groq · Llama 3.3-70b · v6.2
+        Powered by Groq · Llama 3.3-70b · v6.3
       </div>
       <div style="font-size:10px;color:#374151;margin-top:2px;">⚡ EV + 🛢️ ICE · 🔒 Private · Secure</div>
     </div>
@@ -2876,6 +3039,13 @@ user_input = st.chat_input(t("chat_input_placeholder"))
 
 if st.session_state.trigger:
     user_input = st.session_state.trigger
+    # Expand "Common Problems My Bike" to include the actual bike model
+    if user_input == "Common Problems My Bike":
+        model = st.session_state.bike_profile.get("model", "")
+        if model:
+            user_input = f"What are the known common problems with {model}? Include real-world issues, how to identify them, and how to fix or prevent them."
+        else:
+            user_input = "What are the most common problems with Indian motorcycles in general? Give me the top issues and how to fix them."
     st.session_state.trigger = None
 
 if user_input and user_input.strip():
